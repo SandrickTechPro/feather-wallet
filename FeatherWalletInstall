@@ -1,0 +1,66 @@
+#!/bin/bash
+
+set -euo pipefail
+
+echo "🚀 Feather Wallet Installer for Ubuntu 24.04"
+
+# Обновление пакетов
+sudo apt update && sudo apt upgrade -y
+
+# Установка всех зависимостей
+sudo apt install -y git build-essential cmake pkg-config ccache \
+  libssl-dev libzstd-dev libboost-all-dev libsodium-dev libunbound-dev \
+  libminiupnpc-dev libunwind-dev liblzma-dev libprotobuf-dev protobuf-compiler \
+  libqrencode-dev libpng-dev libjpeg-dev libreadline-dev libusb-1.0-0-dev \
+  libhidapi-dev doxygen graphviz qt6-base-dev qt6-tools-dev qt6-tools-dev-tools \
+  qt6-l10n-tools libqt6svg6-dev libqt6websockets6-dev libqt6networkauth6-dev \
+  qt6-multimedia-dev qt6-wayland-dev libprotobuf-dev protobuf-compiler
+
+# Установка ZXing из исходников
+cd ~
+if [ ! -d "zxing-cpp" ]; then
+  git clone --depth 1 --branch v2.1.0 https://github.com/nu-book/zxing-cpp.git
+  cd zxing-cpp
+  mkdir build && cd build
+  cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON ..
+  make -j$(nproc)
+  sudo make install
+  sudo ldconfig
+fi
+
+# Установка Rust
+if ! command -v cargo &> /dev/null; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  source ~/.cargo/env
+fi
+
+# Клонирование Feather
+cd ~
+if [ ! -d "feather" ]; then
+  git clone --recursive https://github.com/feather-wallet/feather.git
+fi
+
+# Сборка Feather Wallet
+cd ~/feather
+git pull
+git submodule update --init --recursive
+
+rm -rf build
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+
+# Финальный этап: Создание ярлыка
+sudo cp feather /usr/local/bin/feather-wallet
+
+# Ярлык в меню приложений
+echo "[Desktop Entry]
+Name=Feather Wallet
+Exec=/usr/local/bin/feather-wallet
+Icon=monero
+Type=Application
+Categories=Finance;Crypto;
+Terminal=false" | sudo tee /usr/share/applications/feather-wallet.desktop
+
+echo "✅ Feather Wallet успешно установлен!"
+echo "Вы можете запустить его командой: feather-wallet"
