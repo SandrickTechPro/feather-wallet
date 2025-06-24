@@ -1,0 +1,116 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Цвета
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+function install_dependencies() {
+  echo -e "${GREEN}▶ Установка зависимостей...${NC}"
+  sudo apt update
+  sudo apt install -y git build-essential cmake pkg-config ccache libssl-dev libboost-all-dev libunbound-dev \
+    libminiupnpc-dev liblzma-dev libprotobuf-dev protobuf-compiler libqrencode-dev qt6-base-dev qt6-tools-dev \
+    qt6-tools-dev-tools libqt6svg6-dev libqt6websockets6-dev libqt6networkauth6-dev qt6-multimedia-dev \
+    qt6-wayland-dev python3-pyqt5 libusb-1.0-0-dev libhidapi-dev tor
+}
+
+function install_tor() {
+  echo -e "${GREEN}▶ Настройка Tor...${NC}"
+  sudo systemctl enable --now tor
+  sudo sed -i 's/#ControlPort 9051/ControlPort 9051/' /etc/tor/torrc
+  sudo systemctl restart tor
+}
+
+function install_electrum() {
+  echo -e "${YELLOW}▶ Установка Electrum...${NC}"
+  git clone https://github.com/spesmilo/electrum.git
+  cd electrum
+  python3 -m pip install --user -r contrib/requirements/requirements.txt
+  sudo ln -sf $(pwd)/run_electrum /usr/local/bin/electrum
+  cd ..
+}
+
+function install_sparrow() {
+  echo -e "${YELLOW}▶ Установка Sparrow...${NC}"
+  sudo apt install -y openjdk-21-jdk
+  git clone https://github.com/sparrowwallet/sparrow.git
+  cd sparrow
+  ./gradlew build
+  sudo ln -sf $(pwd)/build/libs/sparrow.jar /usr/local/bin/sparrow
+  cd ..
+}
+
+function install_wasabi() {
+  echo -e "${YELLOW}▶ Установка Wasabi...${NC}"
+  sudo apt install -y dotnet-sdk-8.0
+  git clone https://github.com/zkSNACKs/WalletWasabi.git
+  cd WalletWasabi/WalletWasabi.Fluent.Desktop
+  dotnet build
+  sudo ln -sf $(pwd)/bin/Debug/net8.0/WalletWasabi.Fluent.Desktop /usr/local/bin/wasabi
+  cd ../..
+}
+
+function install_feather() {
+  echo -e "${YELLOW}▶ Установка Feather...${NC}"
+  git clone --recursive https://github.com/feather-wallet/feather.git
+  cd feather
+  mkdir build && cd build
+  cmake ..
+  make -j$(nproc)
+  sudo ln -sf $(pwd)/feather /usr/local/bin/feather
+  cd ../..
+}
+
+function install_monero_gui() {
+  echo -e "${YELLOW}▶ Установка Monero GUI...${NC}"
+  git clone --recursive https://github.com/monero-project/monero-gui.git
+  cd monero-gui
+  ./build.sh
+  sudo ln -sf $(pwd)/build/release/bin/monero-wallet-gui /usr/local/bin/monero-gui
+  cd ..
+}
+
+function install_myetherwallet() {
+  echo -e "${YELLOW}▶ Установка MyEtherWallet...${NC}"
+  sudo apt install -y nodejs npm
+  git clone https://github.com/MyEtherWallet/MyEtherWallet.git
+  cd MyEtherWallet
+  npm install
+  npm run build
+  sudo ln -sf $(pwd)/dist /usr/local/bin/myetherwallet
+  cd ..
+}
+
+function main_menu() {
+  echo -e "${GREEN}Выберите кошелёк для установки:${NC}"
+  echo "1. Electrum (BTC)"
+  echo "2. Sparrow Wallet (BTC)"
+  echo "3. Wasabi Wallet (BTC)"
+  echo "4. Feather Wallet (XMR)"
+  echo "5. Monero GUI Wallet (XMR)"
+  echo "6. MyEtherWallet (ETH)"
+  echo "7. Установить и настроить Tor"
+  echo "8. Выход"
+
+  read -rp "Введите номер опции: " choice
+
+  case "$choice" in
+    1) install_electrum ;;
+    2) install_sparrow ;;
+    3) install_wasabi ;;
+    4) install_feather ;;
+    5) install_monero_gui ;;
+    6) install_myetherwallet ;;
+    7) install_tor ;;
+    8) exit 0 ;;
+    *) echo -e "${YELLOW}Неверный выбор!${NC}" ;;
+  esac
+}
+
+install_dependencies
+
+while true; do
+  main_menu
+done
